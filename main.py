@@ -1,21 +1,25 @@
 # import matplotlib.pyplot as plt
 from PIL import Image
+from flask import Flask
 
-from vietocr.tool.predictor import Predictor
-from vietocr.tool.config import Cfg
+import yaml
+import model
 
-def load_model(weith_path, device):
-    config = Cfg.load_config_from_name('vgg_transformer')
-    config['weights'] = weith_path
-    config['cnn']['pretrained'] = False
-    config['device'] = device
-    config['predictor']['beamsearch'] = False
-    model = Predictor(config)
-    return model 
+with open("config.yaml", "r") as file:
+    app_config = yaml.load(file,  Loader=yaml.BaseLoader)
 
-model = load_model('models/weights.pth', 'cpu')
 
-img_path = 'models/validate/test5.png'
-img = Image.open(img_path)
-result = model.predict(img)
-print(result)
+base_path = "D:/GemDino/WEB-RESOURCE/school-automate/captcha"
+model = model.load_model('models/weights.pth', 'cpu')
+app = Flask(__name__)
+
+
+@app.route('/api/captcha/<captchaId>', methods=["GET"])
+def predict_captcha(captchaId):
+    img_path = base_path + "/" + captchaId + ".png"
+    result = model.predict(Image.open(img_path))
+    return result
+
+
+if __name__ == '__main__':
+    app.run(port=app_config["server"]["port"], debug=True)

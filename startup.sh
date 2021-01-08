@@ -1,0 +1,1 @@
+cat favicon.txt && echo developed by chiennv, tuana9a,... && python main.py
