@@ -1,7 +1,7 @@
 
 import os
 import logging
-import yaml
+import io
 
 from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
@@ -9,9 +9,6 @@ from flask import Flask, request, jsonify, flash
 from werkzeug.utils import secure_filename
 from PIL import Image
 from configparser import ConfigParser
-
-with open('./config/security.yaml', 'r') as file:
-    security_yaml = yaml.load(file,  Loader=yaml.BaseLoader)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
@@ -37,7 +34,8 @@ def init_server(custom_config=None):
     app = Flask(__name__, instance_relative_config=True)
     # ensure the instance folder exists
     try:
-        os.makedirs(app.instance_path)
+        instance_path = app.instance_path
+        os.makedirs(instance_path)
     except OSError:
         pass
     # param config
@@ -46,11 +44,8 @@ def init_server(custom_config=None):
 
     # manual config
     app.config.from_mapping(
-        SECRET_KEY="b7HHex1dxdfjxfcxd3x1b!xb4xe6m",
-        UPLOAD_FOLDER="./resource",
+        SECRET_KEY='b7HHex1dxdfjxfcxd3x1b!xb4xe6m',
         MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # EXPLAIN: 5MB
-        ROOT_KEY=security_yaml['ROOT_KEY'],
-        CURRENT_KEY=security_yaml['CURRENT_KEY']
     )
 
     # custom loggin
@@ -63,47 +58,36 @@ def create_app():
     app = init_server()
 
     model = load_model('./models/weights.pth', 'cpu')
-    print('======================================= READY =============================================')
+    print(' * Server: http://localhost:2029 ')
 
-    @app.route("/")
+    @app.route('/')
     def index():
-        return "Hello World!"
+        return 'Hello World!'
 
     @app.route('/api/predict/captcha', methods=['POST'])
     def upload_to_predict():
         if 'file' not in request.files:
             flash('No file part')
-            return "no file upload"
+            return 'no file upload'
 
         uploadfile = request.files['file']
         filename = secure_filename(uploadfile.filename)
 
         if uploadfile and allowed_file(filename):
+            try:
+                buffers = uploadfile.stream._file.getvalue()
+                image = Image.open(io.BytesIO(buffers))
+                
+                result = model.predict(img=image)
+                return result
 
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            uploadfile.save(filepath)
+            except NameError:
+                return 'Error'
+            except TypeError:
+                return 'Error'
+            except ValueError:
+                return 'Error'
 
-            image = Image.open(filepath)
-            result = model.predict(img=image)
-
-            os.remove(filepath)
-            return result
-
-        return "not allowed: " + filename
-
-    @app.route('/api/micro/current-key', methods=['PUT'])
-    def update_current_key():
-        key = request.get_json()['key']
-        auth = request.headers['auth']
-
-        response = dict({'success': True, 'body': ''})
-        if auth == app.config['ROOT_KEY']:
-            app.config['CURRENT_KEY'] = key
-            response['body'] = 'update success'
-        else:
-            response['success'] = False
-            response['body'] = 'unauthorized'
-
-        return jsonify(response)
+        return 'not allowed: ' + filename
 
     return app
