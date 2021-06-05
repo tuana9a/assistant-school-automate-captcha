@@ -19,6 +19,7 @@ venv\Scripts\activate
 python main.py
 
 # =====LINUX=====
+# CAUTION: venv có vấn đề về network khi restart app bị connection refused kể cả khi đã listen
 # install
 python3.9.5
 python -m venv venv

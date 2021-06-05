@@ -1,45 +1,41 @@
+import services.AskMasterService as AskMasterService
 import flaskr
 import yaml
-import time
 import threading
-import requests
 import json
 
 with open('./config/server.yml') as f:
     config_server = yaml.load(f, Loader=yaml.FullLoader)
 
-stop_flag = 0
+
+def set_interval(func, sec, delay=True):
+    def func_wrapper():
+        set_interval(func, sec)
+        func()
+
+    if(not delay):
+        func()
+
+    t = threading.Timer(sec, func_wrapper)
+    t.start()
+    return t
 
 
-class AskMasterThread(threading.Thread):
-    def askWorkerAddress(self, url, data):
-        try:
-            response = requests.post(url, data)
-        except:
-            global stop_flag
-            stop_flag = 1
-            print(' * thread: ask master failed')
+def askMaster():
+    url = config_server['master-address'] + '/api/worker/ask/worker-address'
+    data = json.dumps({
+        'from':  {
+            'name': 'assistant-school-automate-captcha',
+            'address': config_server['address']
+        },
+        'asks': ['assistant-school-automate-captcha']
+    })
 
-    def run(self):
-        print(' * thread: start ask master')
-        while not stop_flag:
-            url = config_server['master-address'] + \
-                '/api/worker/ask/worker-address'
-            data = json.dumps({
-                'from':  {
-                    'name': 'assistant-school-automate-captcha',
-                    'address': config_server['address']
-                },
-                'asks': ['assistant-school-automate-captcha']
-            })
-            # print(data)
-            self.askWorkerAddress(url, data)
-            time.sleep(10)
-        print(' * thread: stop ask master')
+    AskMasterService.askWorkerAddress(url, data)
 
 
-thread = AskMasterThread()
-thread.start()
+print(' * thread: start ask master')
+set_interval(askMaster, 10, False)
 
 app = flaskr.create_app()
 print(' * listen: ' + config_server['address'])

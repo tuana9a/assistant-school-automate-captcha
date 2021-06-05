@@ -55,7 +55,7 @@ def init_server(custom_config=None):
 def create_app():
     app = init_server()
     model = load_model()
-
+    print(' * model: load success')
     @app.route('/api/predict/captcha', methods=['POST'])
     def upload_to_predict():
         if 'file' not in request.files:
