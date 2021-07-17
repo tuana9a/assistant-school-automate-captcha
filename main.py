@@ -7,11 +7,8 @@ from vietocr.tool.predictor import Predictor
 
 import os
 import io
-import json
 import yaml
 import logging
-import requests
-import threading
 
 with open('resource/app-config.yml') as f:
     APP_CONFIG = yaml.load(f, Loader=yaml.FullLoader)
@@ -64,40 +61,10 @@ def init_server(custom_config=None):
 app = init_server()
 
 
-def set_interval(func, sec, delay=True):
-    def func_wrapper():
-        set_interval(func, sec)
-        func()
-
-    if(not delay):
-        func()
-
-    t = threading.Timer(sec, func_wrapper)
-    t.start()
-    return t
-
-
-def ask_worker_address():
-    url = APP_CONFIG['master']['address'] + '/api/worker/ask/worker-address'
-    data = json.dumps({
-        'from':  {
-            'name': 'assistant-school-automate-captcha',
-            'address': APP_CONFIG['server']['address']
-        },
-        'asks': ['assistant-school-automate-captcha']
-    })
-    try:
-        response = requests.post(url, data)
-        return response
-    except:
-        print(' * thread: ask master failed')
-        return 'Error: ask master failed'
-
-
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 
-def allowed_file(filename):
+def check_allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
@@ -110,7 +77,7 @@ def upload_to_predict():
     uploadfile = request.files['file']
     filename = secure_filename(uploadfile.filename)
 
-    if uploadfile and allowed_file(filename):
+    if uploadfile and check_allowed_file(filename):
         try:
             buffers = uploadfile.stream._file.getvalue()
             image = Image.open(io.BytesIO(buffers))
@@ -126,6 +93,5 @@ def upload_to_predict():
     return 'not allowed: ' + filename
 
 
-set_interval(ask_worker_address, 10)
-print(' * listen: ' + APP_CONFIG['server']['address'])
+print(' * Listen: ' + APP_CONFIG['server']['address'])
 app.run(host='0.0.0.0', port=APP_CONFIG['server']['port'])
