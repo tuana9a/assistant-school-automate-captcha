@@ -7,28 +7,23 @@ from vietocr.tool.predictor import Predictor
 
 import os
 import io
+import sys
 import yaml
 import logging
 
 with open('resource/app-config.yml') as f:
-    APP_CONFIG = yaml.load(f, Loader=yaml.FullLoader)
+    AppConfig = yaml.load(f, Loader=yaml.FullLoader)
 
 
-def load_model(config_path, weights_path, device_type):
-    model_config = Cfg.load_config_from_file(config_path)
-    model_config['weights'] = weights_path
-    model_config['device'] = device_type
+def load_model():
+    config = AppConfig['vietocr']
+    model_config = Cfg.load_config_from_file(config['weights']['config'])
+    model_config['weights'] = config['weights']['path']
+    model_config['device'] = config['device_type']
     # EXPLAIN: để false vì mình không train
     model_config['cnn']['pretrained'] = False
     model = Predictor(model_config)
     return model
-
-
-model = load_model(
-    config_path=APP_CONFIG['weights']['config'],
-    weights_path=APP_CONFIG['weights']['path'],
-    device_type=APP_CONFIG['weights']['device']
-)
 
 
 def init_server(custom_config=None):
@@ -58,40 +53,47 @@ def init_server(custom_config=None):
     return app
 
 
-app = init_server()
-
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-
 def check_allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in AppConfig['flask']['allowed_extension']
 
 
-@app.route('/api/predict/captcha', methods=['POST'])
-def upload_to_predict():
-    if 'file' not in request.files:
-        flash('No file part')
-        return 'no file upload'
+def main():
+    model = load_model()
+    app = init_server()
 
-    uploadfile = request.files['file']
-    filename = secure_filename(uploadfile.filename)
+    @app.route('/api/predict/captcha', methods=['POST'])
+    def upload_to_predict():
+        if 'file' not in request.files:
+            flash('No file part')
+            return 'no file upload'
 
-    if uploadfile and check_allowed_file(filename):
-        try:
-            buffers = uploadfile.stream._file.getvalue()
-            image = Image.open(io.BytesIO(buffers))
-            result = model.predict(img=image)
-            return result
+        uploadfile = request.files['file']
+        filename = secure_filename(uploadfile.filename)
 
-        except TypeError:
-            return 'Error'
+        if uploadfile and check_allowed_file(filename):
+            try:
+                buffers = uploadfile.stream._file.getvalue()
+                image = Image.open(io.BytesIO(buffers))
+                result = model.predict(img=image)
+                return result
 
-        except ValueError:
-            return 'Error'
+            except TypeError:
+                return 'Error'
 
-    return 'not allowed: ' + filename
+            except ValueError:
+                return 'Error'
+
+        return 'not allowed: ' + filename
+
+    print(' * Listen: ' + AppConfig['server']['address'])
+    app.run(host='0.0.0.0', port=AppConfig['server']['port'])
 
 
-print(' * Listen: ' + APP_CONFIG['server']['address'])
-app.run(host='0.0.0.0', port=APP_CONFIG['server']['port'])
+try:
+    main()
+except KeyboardInterrupt:
+    print('KeyboardInterupt')
+    try:
+        sys.exit(0)
+    except SystemExit:
+        os._exit(0)
