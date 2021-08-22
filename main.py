@@ -86,14 +86,15 @@ def main():
         return 'not allowed: ' + filename
 
     print(' * Listen: ' + AppConfig['server']['address'])
-    app.run(host='0.0.0.0', port=AppConfig['server']['port'])
+    app.run(host=AppConfig['server']['bind'], port=AppConfig['server']['port'])
 
 
-try:
-    main()
-except KeyboardInterrupt:
-    print('KeyboardInterupt')
+if __name__ == '__main__':
     try:
-        sys.exit(0)
-    except SystemExit:
-        os._exit(0)
+        main()
+    except KeyboardInterrupt:
+        print('KeyboardInterupt')
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
